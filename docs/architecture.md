@@ -352,6 +352,13 @@ flowchart TB
   class CC,DM,DP def;
 ```
 
+**Decided (target state):** Local native Codex subscription auth uses an
+operator-authorized runner broker, a private host profile and a revocable
+OpenShell stable placeholder; the sandbox receives no reusable account
+credentials ([ADR 0085](ADRs/0085-runner-owned-native-codex-auth.md)). Initial
+scope is one context without delegation, with existing API/gateway defaults
+unchanged. The ADR records the choice; it does not ship a usable mode.
+
 **Decided (implementation):**
 
 - The `fullsend run` runner delegates in-sandbox agent execution to a `runtime.Runtime` interface; production orgs default to Claude Code, with [pi](https://github.com/earendil-works/pi) available as an opt-in second runtime (`runtime: pi`, Claude-on-Vertex through the same WIF credential path), [codex](https://github.com/openai/codex) as a third (`runtime: codex`, OpenAI models through a custom model provider whose bearer token comes from a runner-seeded file, or `gateway/` models through a runner-owned gateway provider ([ADR 0137](ADRs/0137-inference-gateway-credential-route.md)), with the sandbox tool hooks behind a translating adapter — [ADR 0099](ADRs/0099-codex-agent-runtime.md) and [ADR 0100](ADRs/0100-codex-sandbox-hooks.md)), and [OpenCode](https://github.com/anomalyco/opencode) as a fourth (`runtime: opencode`, Claude-on-Vertex through the same WIF credential path; read-only agents only until the security-hook plugin adapter in [unbound-force#515](https://github.com/unbound-force/unbound-force/issues/515) lands). Runtime selection is configured per repo with `runtime:` in `.fullsend/config.yaml` (per-agent `runtime`/`model`/`effort`/`subagents` on the agent's `agents:` entry sit above it and below the `--runtime`/`--model`/`--effort` flags and `FULLSEND_*` variables, [ADR 0091](ADRs/0091-per-agent-runtime-model-effort.md)) and resolved via `runtime.ResolveForAgent()`. Test-only runtimes — **dummy** (scripted operations) and **dummy-playback** (playlist-based replay of canned results) — execute in the real OpenShell sandbox for behaviour tests without inference. Bootstrap uses a portable `BootstrapInput` interface with optional extensions such as `SandboxHooksBootstrap` for the runtime-neutral sandbox tool hooks ([ADR 0090](ADRs/0090-runtime-neutral-sandbox-hooks-contract.md)); runtimes declare further capabilities through small optional interfaces (`DebugLogNamer`, `ContextBridger`) rather than `Name()` checks in the runner. Transcript and debug artifact handling use a separate `TranscriptHandler` interface. See [runtimes.md](runtimes.md) for the per-runtime security feature matrix required when adding a new backend.
