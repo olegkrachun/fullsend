@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="A dated implementation and verification report for local Codex subscription authentication in the fullsend fork.">
+  <title>Local Codex subscription auth — fullsend change report</title>
+  <style>
+    :root {
+      --bg: #0c1220;
+      --panel: #131c2e;
+      --line: #274060;
+      --text: #e8edf4;
+      --muted: #b5c1d2;
+      --accent: #c4ff0e;
+      --warn: #ffd18b;
+      --danger: #ffb7ac;
+      --mono: "JetBrains Mono", Menlo, Consolas, monospace;
+      --sans: "Plus Jakarta Sans", "Avenir Next", "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-padding-top: 28px; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.65 var(--sans); }
+    a { color: var(--accent); text-underline-offset: 4px; }
+    a:hover { text-decoration-thickness: 2px; }
+    a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+    button { font: inherit; cursor: pointer; }
+    button, summary, nav a { min-height: 44px; }
+    code { font: .87em/1.6 var(--mono); overflow-wrap: anywhere; }
+    p, h1, h2, h3 { margin-top: 0; }
+    h1 { font-size: clamp(2rem, 3.3vw, 3rem); line-height: 1.15; letter-spacing: -.04em; max-width: 830px; margin-bottom: 18px; }
+    h2 { font-size: 1.45rem; line-height: 1.3; letter-spacing: -.025em; margin-bottom: 12px; }
+    h3 { font-size: 1rem; margin-bottom: 6px; }
+    p { margin-bottom: 14px; }
+    .muted, .note { color: var(--muted); }
+    .eyebrow, .index, .state, .lane-label, th { font: 11px/1.5 var(--mono); letter-spacing: .075em; text-transform: uppercase; }
+    .eyebrow { color: var(--accent); margin-bottom: 18px; }
+    .skip { position: absolute; left: 18px; top: -80px; padding: 12px 18px; background: var(--accent); color: var(--bg); z-index: 5; }
+    .skip:focus { top: 12px; }
+    .shell { display: grid; grid-template-columns: 228px minmax(0, 1fr); max-width: 1600px; margin: auto; }
+    .sidebar { position: sticky; top: 0; height: 100vh; padding: 34px 24px; border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+    .brand { color: var(--text); font-size: 22px; font-weight: 800; text-decoration: none; letter-spacing: -.06em; }
+    .brand span { color: var(--accent); }
+    .sidebar .descriptor { margin: 8px 0 30px; color: var(--muted); font-size: 12px; }
+    nav a { display: flex; align-items: center; gap: 14px; color: var(--muted); text-decoration: none; border-bottom: 1px solid transparent; }
+    nav a:hover { color: var(--text); border-color: var(--line); }
+    .index { color: var(--accent); font-size: 10px; }
+    .sidebar-footer { margin-top: auto; color: var(--muted); font-size: 11px; padding-top: 24px; }
+    main { min-width: 0; padding: 34px clamp(24px, 5vw, 76px) 52px; }
+    .topline { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 36px; }
+    .snapshot { font: 12px var(--mono); color: var(--muted); }
+    .print { background: transparent; color: var(--text); padding: 8px 15px; border: 1px solid var(--line); border-radius: 5px; }
+    .print:hover { background: var(--panel); }
+    .intro { max-width: 760px; font-size: 17px; color: var(--muted); }
+    .status-line { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 24px 0 30px; }
+    .pill { display: inline-flex; align-items: center; padding: 5px 10px; border: 1px solid var(--line); border-radius: 4px; font: 11px/1.5 var(--mono); }
+    .pill.warning { color: var(--warn); border-color: #735c38; }
+    .status-caption { color: var(--muted); font-size: 12px; }
+    .notice { background: var(--panel); padding: 20px 22px; border: 1px solid var(--line); border-radius: 6px; margin: 0 0 32px; }
+    .notice strong { color: var(--warn); }
+    .notice p:last-child { margin-bottom: 0; }
+    .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 28px; margin: 28px 0 0; }
+    .fact { padding: 14px 0; border-top: 1px solid var(--line); min-width: 0; }
+    .fact dt { color: var(--muted); font: 11px var(--mono); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 7px; }
+    .fact dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+    section { margin-top: 54px; }
+    .section-head { display: flex; gap: 15px; align-items: baseline; border-top: 1px solid var(--line); padding-top: 24px; margin-bottom: 15px; }
+    .section-head .index { flex: 0 0 auto; }
+    .section-head h2 { margin-bottom: 0; }
+    .changes { list-style: none; margin: 0; padding: 0; }
+    .changes > li { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 24px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+    .changes .label { font-weight: 700; }
+    .changes p { margin-bottom: 9px; }
+    .files { color: var(--muted); font: 11px/1.8 var(--mono); overflow-wrap: anywhere; }
+    .flow { display: grid; grid-template-columns: 1.2fr .8fr; gap: 20px; margin: 22px 0; }
+    .lane { background: var(--panel); padding: 22px; border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+    .lane-label { color: var(--muted); padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+    .flow ol { padding: 0; margin: 0; list-style: none; }
+    .flow li + li::before { content: "↓"; display: block; color: var(--accent); margin: 12px 0; }
+    .flow .detail { color: var(--muted); font-size: 12px; display: block; margin-top: 3px; }
+    .routes { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 18px; }
+    .routes code { display: block; margin-top: 7px; color: var(--accent); }
+    .filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0 14px; }
+    .filter { color: var(--muted); border: 1px solid var(--line); background: transparent; border-radius: 4px; padding: 8px 13px; font-size: 12px; }
+    .filter[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+    .ledger-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+    table { width: 100%; min-width: 640px; border-collapse: collapse; text-align: left; }
+    caption { text-align: left; padding: 16px; background: var(--panel); color: var(--muted); font-size: 12px; }
+    th { color: var(--muted); background: var(--panel); font-weight: 400; }
+    th, td { padding: 15px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th:first-child { width: 27%; }
+    td { font-size: 12px; }
+    td strong { display: block; font-size: 13px; font-weight: 650; margin-bottom: 4px; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .state { white-space: nowrap; font-size: 10px; }
+    .verified { color: var(--accent); }
+    .blocked { color: var(--warn); }
+    .notrun { color: var(--muted); }
+    [hidden] { display: none !important; }
+    .filter-result { font-size: 12px; color: var(--muted); margin: 10px 0 0; min-height: 20px; }
+    .note { font-size: 12px; margin-top: 14px; }
+    details { border-bottom: 1px solid var(--line); padding: 8px 0; }
+    summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; cursor: pointer; font-weight: 650; list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: "+"; font: 20px var(--mono); color: var(--accent); }
+    details[open] summary::after { content: "−"; }
+    details p { margin: 10px 0 18px; color: var(--muted); font-size: 13px; max-width: 760px; }
+    .blockers { list-style: none; padding: 0; margin: 20px 0 0; }
+    .blockers li { display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 10px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+    .blockers .number { font: 12px var(--mono); color: var(--warn); padding-top: 3px; }
+    .blockers p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+    .scope { padding: 0 0 0 20px; color: var(--muted); }
+    .scope li { margin-bottom: 10px; padding-left: 4px; }
+    .reference-list { list-style: none; padding: 0; }
+    .reference-list li { display: flex; gap: 20px; align-items: baseline; justify-content: space-between; flex-wrap: wrap; padding: 15px 0; border-bottom: 1px solid var(--line); }
+    .reference-list small { color: var(--muted); }
+    footer { border-top: 1px solid var(--line); margin-top: 48px; padding-top: 20px; color: var(--muted); font-size: 11px; }
+    @media (max-width: 950px) { .shell { grid-template-columns: 186px minmax(0, 1fr); } .sidebar { padding: 30px 18px; } .changes > li { grid-template-columns: 135px minmax(0, 1fr); gap: 18px; } .flow { grid-template-columns: 1fr; } }
+    @media (max-width: 650px) { .shell { display: block; } .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 18px 20px; } .sidebar .descriptor, .sidebar nav, .sidebar-footer { display: none; } main { padding: 22px 20px 38px; } .topline { margin-bottom: 26px; } .changes > li { grid-template-columns: 1fr; gap: 8px; } .facts { grid-template-columns: 1fr; gap: 0; } h1 { font-size: 2.15rem; } section { margin-top: 38px; } .intro { font-size: 15px; } .status-line { align-items: flex-start; } }
+    @media print { :root { --bg: #fff; --panel: #f4f5f6; --text: #17202d; --muted: #455263; --line: #c8cfd8; --accent: #365314; --warn: #7c4500; } body { font-size: 12pt; } .shell { display: block; } .sidebar, .print, .filters, .filter-result, .skip { display: none; } main { padding: 0; } .flow { grid-template-columns: 1fr 1fr; } .notice, .lane, tr, details { break-inside: avoid; } th, td, caption, .note, .files, .state, .detail, .lane-label, .eyebrow, .index, .snapshot, .fact dt, .fact dd, details p, .blockers p, .reference-list small, footer { font-size: 12pt; } a { color: #365314; } section { margin-top: 25px; } }
+  </style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to report</a>
+<div class="shell">
+  <aside class="sidebar" aria-label="Report navigation">
+    <a class="brand" href="#overview">fullsend<span> /</span></a>
+    <p class="descriptor">Engineering change report</p>
+    <nav aria-label="Sections">
+      <a href="#overview"><span class="index">01</span>Overview</a>
+      <a href="#changes"><span class="index">02</span>Changes</a>
+      <a href="#boundary"><span class="index">03</span>Trust boundary</a>
+      <a href="#verification"><span class="index">04</span>Verification</a>
+      <a href="#blockers"><span class="index">05</span>Open blockers</a>
+      <a href="#references"><span class="index">06</span>References</a>
+    </nav>
+    <div class="sidebar-footer">A static snapshot, not live CI.<br>No telemetry. No remote assets.</div>
+  </aside>
+  <main id="main">
+    <div class="topline"><span class="snapshot">SNAPSHOT / <time datetime="2026-11-17">17 NOV 2026</time></span><button class="print" id="print-report" type="button">Print / save PDF</button></div>
+    <header id="overview">
+      <p class="eyebrow">Local execution · Native subscription authentication</p>
+      <h1>Codex subscription auth.<br>Implemented, not signed off.</h1>
+      <p class="intro">A change report for the fullsend fork: use the official Codex client with an operator’s ChatGPT subscription, while keeping reusable account credentials outside the agent sandbox.</p>
+      <div class="status-line"><span class="pill warning">EXPERIMENTAL · VERIFICATION OPEN</span><span class="status-caption">Implementation exists in the working tree. It is not merged or released.</span></div>
+      <div class="notice"><p><strong>Not ready for real-account use.</strong> Reported upload/cleanup defects have tested patches and provider/cleanup re-review passes. The final automated upload review was blocked by the provider and produced no verdict; it was not retried or rerouted. Fresh repository checks also found an unresolved broker deadline test failure. No personal ChatGPT credentials, real login, real upstream OAuth refresh or real model request were used.</p></div>
+      <dl class="facts">
+        <div class="fact"><dt>Implementation branch</dt><dd><code>feat/local-codex-subscription</code> — not yet published as an implementation PR</dd></div>
+        <div class="fact"><dt>Compatibility inspected</dt><dd>Official Codex <code>0.166.0</code> · OpenShell <code>0.1.4</code></dd></div>
+        <div class="fact"><dt>Existing auth routes</dt><dd>API, workload identity and gateway selection remain the default when native mode is omitted.</dd></div>
+        <div class="fact"><dt>Important migration</dt><dd>Codex login files are now recognized as durable host credentials. Native mode rejects recognizable credential uploads even with <code>allow_durable</code>.</dd></div>
+      </dl>
+    </header>
+
+    <section id="changes" aria-labelledby="changes-title">
+      <div class="section-head"><span class="index">02</span><h2 id="changes-title">What changed</h2></div>
+      <ul class="changes">
+        <li><div class="label">Explicit CLI authority</div><div><p>Added <code>--codex-auth chatgpt</code>, <code>--codex-auth-profile</code> and <code>--codex-binary</code>. Native mode also requires the explicit <code>--runtime codex</code> flag. Repository config and environment variables cannot opt into account access.</p><div class="files">internal/cli/run.go · run_codex_subscription*.go</div></div></li>
+        <li><div class="label">Runner-owned broker</div><div><p>The official app-server owns refresh. The broker validates the selected profile, native refresh authority, token expiry and account/user continuity. A private persistent lock serializes access to the canonical credential directory.</p><div class="files">internal/inference/codexauth/</div></div></li>
+        <li><div class="label">Native runtime branch</div><div><p>The constructor holds trusted identity metadata. Launch regenerates sandbox auth with an issued stable handle, an empty refresh value and a noncredential identity stub. It pins native routes and scrubs alternate auth and routing variables.</p><div class="files">internal/runtime/codex_subscription.go · codex bootstrap/config/run/integrity helpers</div></div></li>
+        <li><div class="label">Activation &amp; revocation</div><div><p>A new SDK helper updates credential value and expiry together. The caller checks intended sandbox/provider/attachment identity and the remaining lifetime before activation. Refresh failure cancels the run. Strict inventory and detach verification, including duplicate-key rejection, now pass independent re-review. Cleanup requests verified revocation even with <code>--keep-sandbox</code> and surfaces failures.</p><div class="files">internal/sandbox/provider_activation.go · CLI provider/refresh/revoke helpers</div></div></li>
+        <li><div class="label">Upload &amp; log guards</div><div><p>Added canonical exclusions and checked snapshots for configured host files, implicit org AGENTS.md and output schemas. Shared BOM classification, bounded final reads and budgeted expansion close the reported bypasses in regression tests. Final independent upload review remains open. Sensitive wrappers and collected OpenShell logs pass through credential redaction.</p><div class="files">internal/cli/host_file_credentials.go · native bootstrap guards · run_log_redact_test.go</div></div></li>
+        <li><div class="label">Tests &amp; documentation</div><div><p>Added synthetic process, locking, malformed-input, upload, lifecycle and CLI tests. Updated CLI/runtime/auth references, reserved-environment tests and sandbox-env schemas. The architecture decision is isolated in its own documentation PR.</p><div class="files">docs/cli/run.md · docs/runtimes/codex.md · auth/runtime guides · sandbox-env schemas</div></div></li>
+      </ul>
+    </section>
+
+    <section id="boundary" aria-labelledby="boundary-title">
+      <div class="section-head"><span class="index">03</span><h2 id="boundary-title">Intended credential boundary</h2></div>
+      <p class="muted">The diagram shows the intended design, not a completed security guarantee. The upload patches still need final independent sign-off. Requests go to the native ChatGPT service; inference is not local.</p>
+      <div class="flow">
+        <div class="lane"><div class="lane-label">Trusted runner &amp; local gateway</div><ol><li><strong>Dedicated private profile</strong><span class="detail">Official login state stays in the selected host directory.</span></li><li><strong>Official Codex broker</strong><span class="detail">Owns refresh; the runner validates identity and remaining lifetime.</span></li><li><strong>Scoped OpenShell provider</strong><span class="detail">Holds the current access credential and enforces handle binding and expiry.</span></li></ol></div>
+        <div class="lane"><div class="lane-label">Agent sandbox</div><ol><li><strong>Stable reference only</strong><span class="detail">Issued provider handle plus noncredential account metadata. No reusable host access, refresh or ID token is seeded.</span></li><li><strong>Native request</strong><span class="detail">The proxy resolves the permitted handle at the allowed destination. The sandbox does not perform host OAuth refresh.</span></li></ol><div class="routes"><span class="lane-label">Subscription scope · chatgpt.com:443</span><code>POST /backend-api/codex/responses</code><code>GET /backend-api/wham/accounts/check</code></div></div>
+      </div>
+      <p class="note">Workspace discovery needs the GET route even with a forced workspace. The scope above concerns subscription traffic, not every unrelated forge or package request. Same-user host code remains trusted: environment filtering does not isolate a credential file from arbitrary host scripts.</p>
+    </section>
+
+    <section id="verification" aria-labelledby="verification-title">
+      <div class="section-head"><span class="index">04</span><h2 id="verification-title">Verification ledger</h2></div>
+      <p class="muted">Passing components and synthetic transport evidence are not a claim that real-account application behavior is verified.</p>
+      <div class="filters" role="group" aria-label="Filter verification results">
+        <button type="button" class="filter" data-filter="all" aria-pressed="true">All checks</button>
+        <button type="button" class="filter" data-filter="verified" aria-pressed="false">Verified</button>
+        <button type="button" class="filter" data-filter="blocked" aria-pressed="false">Open / failed</button>
+        <button type="button" class="filter" data-filter="notrun" aria-pressed="false">Not verified</button>
+      </div>
+      <div class="ledger-wrap" tabindex="0" aria-label="Verification results; scroll horizontally on small screens">
+        <table><caption>Recorded tool results for this snapshot. Counts include test and subtest events.</caption><thead><tr><th scope="col">Check</th><th scope="col">Recorded result</th><th scope="col">State</th></tr></thead><tbody>
+          <tr data-check-state="verified"><td><strong>Focused CLI &amp; env contracts</strong></td><td>63 passing test/subtest events under the race detector. Real <code>go run ./cmd/fullsend run --help</code> builds and exposes the new flags.</td><td><span class="state verified">Passed</span></td></tr>
+          <tr data-check-state="blocked"><td><strong>Auth broker &amp; profile lease</strong></td><td>Earlier focused race/vet checks passed with 91.3% package coverage. The fresh root run fails <code>TestExportDeadlineKillsAndReaps</code>: expected deadline exceeded, received broker closed. A narrow race rerun passes 20/20, but the failure remains unresolved and is not classified as baseline.</td><td><span class="state blocked">Unresolved</span></td></tr>
+          <tr data-check-state="verified"><td><strong>Activation SDK</strong></td><td>Focused race/vet checks pass. New-file statement coverage: 98.13%. Independent component review reports no blockers.</td><td><span class="state verified">Passed</span></td></tr>
+          <tr data-check-state="verified"><td><strong>Native transport fixture</strong></td><td>Official Codex and actual OpenShell send credential generations A then B in the same running client over verified HTTPS. Exact-route and isolated wrong-host controls pass. This is a separate synthetic transport fixture.</td><td><span class="state verified">Proven scope</span></td></tr>
+          <tr data-check-state="verified"><td><strong>Lint, vet &amp; mintcore</strong></td><td>Fresh staged <code>make lint</code> and repository-wide <code>go vet</code> exit successfully. The separate mintcore race run records 550 passing test/subtest events.</td><td><span class="state verified">Passed</span></td></tr>
+          <tr data-check-state="verified"><td><strong>Post-schema full CLI race suite</strong></td><td>26,640 passed and 106 skipped test/subtest events; package passed in 311.382 seconds. Schema selectors and late-swap regressions pass. The new checked-schema helper and changed schema blocks each cover 11/11 statements. Earlier upload changed-block approximation is 95.71%; whole-function <code>runAgent</code> coverage is 76.0%, not a blanket 80%-per-function result.</td><td><span class="state verified">Passed scope</span></td></tr>
+          <tr data-check-state="blocked"><td><strong>Full root regression</strong></td><td>Fresh result: 48,565 passed, 215 skipped and 16 failed test/subtest events. Fifteen failure identities match the unchanged-base comparison: macOS architecture assumptions, missing PyYAML and a system-CA test. The additional failure is the new broker deadline case, not a baseline failure. CLI, runtime, config, security and sandbox packages pass in this root run.</td><td><span class="state blocked">Not green</span></td></tr>
+          <tr data-check-state="blocked"><td><strong>Integrated sign-off</strong></td><td>Provider/cleanup re-review passes. The final upload/authority reviewer was blocked by the provider safety filter and returned no verdict. This is unavailable review, not approval or a reported code defect. It was not retried or rerouted. Human review is required; the implementation remains local and unsigned-off.</td><td><span class="state blocked">Review blocked</span></td></tr>
+          <tr data-check-state="notrun"><td><strong>Real-account behavior</strong></td><td>No real login, upstream OAuth refresh, entitlement check or real model inference. Those require separate operator approval and a dedicated profile.</td><td><span class="state notrun">Not tested</span></td></tr>
+          <tr data-check-state="notrun"><td><strong>Full Linux regression</strong></td><td>Linux cross-build checks are not executed Linux tests. The complete application suite has not been verified on Linux in this change report.</td><td><span class="state notrun">Not verified</span></td></tr>
+        </tbody></table>
+      </div>
+      <p id="filter-result" class="filter-result" aria-live="polite">Showing all recorded checks.</p>
+      <p class="note">These are event counts, not distinct top-level tests. Skips do not prove containment. JWT parsing checks local consistency; it does not verify signatures or subscription entitlement. No remote CI checks were reported for the architecture PR when inspected.</p>
+      <details><summary>Security findings already corrected</summary><p>Restricted persisted OAuth issuer/client provenance; enforced canonical case-sensitive JWT fields and strict expiry/encoding; fixed credential detection when unrelated JSON numbers overflow; moved the cooperative lock from ancestor HOME into canonical CODEX_HOME; added formatter coverage for unsupported verbs, pointers and nested exported containers; scrubbed inherited organization/project routing variables.</p></details>
+    </section>
+
+    <section id="blockers" aria-labelledby="blockers-title">
+      <div class="section-head"><span class="index">05</span><h2 id="blockers-title">What remains open</h2></div>
+      <ul class="blockers">
+        <li><span class="number">01</span><div><strong>Obtain human upload/authority review</strong><p>The automated final reviewer produced no verdict because the provider blocked the request. No retry or rerouting was attempted. The frozen diff includes all reported upload fixes, but regression success cannot replace independent sign-off.</p></div></li>
+        <li><span class="number">02</span><div><strong>Resolve the broker deadline failure</strong><p>The fresh root run reports broker closed where deadline exceeded was expected. A narrow 20-run race repeat passes, which does not clear the observed failure. Root verification is non-green even though staged lint, vet, mintcore and the complete CLI package pass.</p></div></li>
+        <li><span class="number">03</span><div><strong>Retain proof and coverage limits</strong><p>Both schema selectors pass real bootstrap tests; native CLI rejects the host script required for validation_loop, so full assembled CLI uses the legacy selector. Synthetic processes do not prove real model inference. Patch coverage and whole-function coverage are reported separately.</p></div></li>
+        <li><span class="number">04</span><div><strong>Decide how to publish the implementation</strong><p>This report and the architecture decision do not publish the authentication implementation. Code remains local while the operator decides whether to open an explicitly unapproved draft for human review. No completed-review or real-account readiness claim is made.</p></div></li>
+      </ul>
+      <h3 style="margin-top:26px">Initial scope is intentionally narrow</h3>
+      <ul class="scope"><li>Manual local execution, one context, no delegation, and no host-side pre/post/validation scripts.</li><li>No automatic import of a personal Codex profile and no silent fallback to API authentication.</li><li>Retaining a sandbox does not retain its subscription capability.</li><li>Claude subscription support, CI/remote subscription use and production entitlement verification are outside this initial slice.</li></ul>
+    </section>
+
+    <section id="references" aria-labelledby="references-title">
+      <div class="section-head"><span class="index">06</span><h2 id="references-title">Review references</h2></div>
+      <ul class="reference-list">
+        <li><a href="https://github.com/olegkrachun/fullsend/issues/1">Implementation issue #1</a><small>Scope, design and recorded proof limits</small></li>
+        <li><a href="https://github.com/olegkrachun/fullsend/pull/2">Architecture draft PR #2</a><small>ADR 0085 · documentation only · not merged</small></li>
+        <li><a href="https://github.com/fullsend-ai/fullsend/tree/17f01392505481a95b0e777bed9ee4bff5e45b93">Inspected upstream base</a><small><code>17f01392505481a95b0e777bed9ee4bff5e45b93</code></small></li>
+      </ul>
+      <p class="note">Implementation file paths above describe local changes, not a published code revision. This report contains no private profile paths, credential values, sandbox handles or raw probe logs.</p>
+    </section>
+    <footer>fullsend fork · Requested engineering report · Static snapshot dated 17 November 2026. Open this file directly in a browser; CSS and JavaScript are embedded. No fonts, scripts or other assets are fetched.</footer>
+  </main>
+</div>
+<script>
+  (() => {
+    const buttons = [...document.querySelectorAll('[data-filter]')];
+    const rows = [...document.querySelectorAll('[data-check-state]')];
+    const status = document.getElementById('filter-result');
+    buttons.forEach(button => {
+      button.addEventListener('click', () => {
+        const selected = button.dataset.filter;
+        buttons.forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+        let visible = 0;
+        rows.forEach(row => {
+          row.hidden = selected !== 'all' && row.dataset.checkState !== selected;
+          if (!row.hidden) visible += 1;
+        });
+        status.textContent = selected === 'all' ? 'Showing all recorded checks.' : `Showing ${visible} ${button.textContent.toLowerCase()} checks.`;
+      });
+    });
+    document.getElementById('print-report').addEventListener('click', () => window.print());
+    let savedFilter = null;
+    window.addEventListener('beforeprint', () => {
+      savedFilter = buttons.find(button => button.getAttribute('aria-pressed') === 'true');
+      rows.forEach(row => { row.hidden = false; });
+    });
+    window.addEventListener('afterprint', () => {
+      if (savedFilter) savedFilter.click();
+      savedFilter = null;
+    });
+  })();
+</script>
+</body>
+</html>
