@@ -137,7 +137,12 @@ Many fullsend scenarios skew toward **ephemeral, task-scoped** execution (triage
   inference through an LLM gateway that accepts the job's OIDC token so the
   forge stores no reusable provider key. [ADR 0138](../ADRs/0138-inference-gateway-api-key-credential-mode.md)
   adds an opt-in API-key mode for gateways that cannot trust forge OIDC, at the
-  cost of a long-lived secret. Tool access restrictions are decided in
+  cost of a long-lived secret. Local native Codex subscription access is
+  decided in [ADR 0085](../ADRs/0085-runner-owned-native-codex-auth.md): explicit
+  operator authority, a private runner-owned profile and a revocable stable
+  placeholder, initially one context without delegation. This target
+  architecture does not ship a usable mode or authorize CI/remote access.
+  Tool access restrictions are decided in
   [ADR 0027](../ADRs/0027-allowed-and-disallowed-tools-for-agents.md), and
   cross-org public GitHub Packages access in
   [ADR 0114](../ADRs/0114-github-packages-via-host-bound-workflow-token-provider.md).
